@@ -1,47 +1,113 @@
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_main.h>
 #include "datatypes.h"
-
-
-typedef struct {
-    ui64 framestart;
-} FrameData;
-
-
-typedef struct {
-    SDL_Window *window;
-    SDL_Renderer *renderer;
-
-    SDL_Event event;
-    FrameData frame;
-
-    ui32 window_height;
-    ui32 window_width;
-} Render;
+#include "datastructs.h"
+#include "physics.h"
+#include "render.h"
+#include <stdlib.h>
 
 
 
-bool InitRender(Render *render, i32 vsync) {
+bool InitRender(MainApp *app, i32 vsync, int win_h, int win_w) {
+    app->render = (Render*)malloc(sizeof(Render));
+    Render *render = app->render;
+    render->frame.framestart = SDL_GetTicksNS();
+
     if (!SDL_InitSubSystem(SDL_INIT_EVENTS | SDL_INIT_VIDEO)) {
         SDL_Log("Subsystem init error: %s", SDL_GetError());
-        return -1;
+        return false;
     }
 
-    if (!SDL_CreateWindowAndRenderer("SPE", render->window_width, render->window_height, 0, render->window, render->renderer)) {
+    if (!SDL_CreateWindowAndRenderer("SPE", win_w, win_h, 0, &render->window, &render->renderer)) {
         SDL_Log("Window or renderer init error: %s", SDL_GetError());
-        return -1;
+        return false;
     }
 
     if (!SDL_SetRenderVSync(render->renderer, vsync)) {
         SDL_Log("VSync couldnt be enabled: %s", SDL_GetError());
-        return -1;
+        return false;
     }
 
-    SDL_SetRenderLogicalPresentation(render->renderer, render->window_width, render->window_height, SDL_LOGICAL_PRESENTATION_LETTERBOX);
+    SDL_SetRenderLogicalPresentation(render->renderer, win_w, win_h, SDL_LOGICAL_PRESENTATION_LETTERBOX);
 
-    render->frame.framestart = SDL_GetTicks();
+    return true;
+}
 
-    return 0;
+
+void UpdateDelta(Render *render, Engine *engine) {
+    FrameData *frame = &render->frame;
+
+    frame->last_framestart = render->frame.framestart;
+    frame->framestart = SDL_GetTicksNS();
+
+    ui64 dt_ns = frame->framestart - frame->last_framestart;
+    f32 dt = (f32)((double)dt_ns / 1000000000.0);
+
+    if (dt > 0.1f) { dt = 0.1f; }
+    engine->dt = dt;
+}
+
+
+void RenderRectangle(SDL_Renderer *renderer, RigidBody *body);
+void RenderCircle(SDL_Renderer *renderer, RigidBody *body, ui8 precision, f32 radius);
+// below is some shit for future
+// void RenderVertexB();
+
+void RenderFrame(Render *render, Engine *engine) {
+    SDL_Renderer *renderer = render->renderer;
+
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
+    SDL_RenderClear(renderer);
+    // idea: loop through phys. bodies and call their rendering callbacks
+    for (ui32 i = 0; i < engine->active_amount; i++) {
+        switch (engine->active_objects[i]->shape) {
+            case BSHAPE_RECTANGLE:
+                RenderRectangle(renderer, engine->active_objects[i]); break;
+            case BSHAPE_CIRCLE:
+                RenderCircle(renderer, engine->active_objects[i], 64, 25.0f); break;
+        }
+    }
+    if (engine->active_amount > 0) { 
+        SDL_RenderDebugTextFormat(renderer, 0.0f, 0.0f, "Body1 velocity: { %f;%f }", engine->active_objects[0]->velocity.x, engine->active_objects[0]->velocity.y);
+    }
+
+    SDL_RenderPresent(renderer);
+}
+
+
+void RenderRectangle(SDL_Renderer *renderer, RigidBody *body) {
+    SDL_FRect rect = { .x=body->screen_pos.x, .y=body->screen_pos.y, .h=50.0f, .w=100.0f}; // constant h and w for now, gonna change it to union property. (radius, half-side, half-h/w)
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+    SDL_RenderRect(renderer, &rect);
+}
+
+
+void RenderCircle(SDL_Renderer *renderer, RigidBody *body, ui8 precision, f32 radius) {
+    ui8 total_vertices = precision+1;
+    SDL_Vertex vertices[total_vertices]; // make vertices and indices static arrs. dont accept radius and precision
+
+    SDL_FColor color = { 0.0f, 0.0f, 0.0f, SDL_ALPHA_OPAQUE_FLOAT };
+    vertices[0].position.x = body->screen_pos.x;
+    vertices[0].position.y = body->screen_pos.y;
+    vertices[0].color = color;
+
+    for (ui8 i = 1; i < total_vertices; i++) {
+        f32 radians = 2.0f * SDL_PI_F * (float)i / (float)precision;
+        vertices[i].position.x = vertices[0].position.x + radius * SDL_cosf(radians);
+        vertices[i].position.y = vertices[0].position.y + radius * SDL_sinf(radians);
+        vertices[i].color = color;
+    }
+
+    i32 indices[precision*3];
+    for (ui8 i = 0; i < precision; i++) {
+        ui8 step = i*3;
+
+        indices[step] = 0;
+        indices[step+1] = i+1;
+        indices[step+2] = i+2;
+    }
+    indices[precision*3-1] = 1; // lock the last triangle
+
+    SDL_RenderGeometry(renderer, NULL, vertices, total_vertices, indices, precision*3);
 }
 
 
@@ -49,4 +115,5 @@ void FreeRender(Render *render) {
     SDL_DestroyWindow(render->window);
     SDL_DestroyRenderer(render->renderer);
     SDL_Quit();
+    free(render);
 }

@@ -15,7 +15,7 @@ typedef struct {
 } MemoryPool;
 
 
-MemoryPool *pool_init(size_t block_size, size_t block_amount) {
+MemoryPool *pool_init(size_t block_size, ui32 block_amount) {
     size_t aligned_block = (block_size + 8 - 1) & ~(8 - 1); // assuming we run on x64. well, who'll run this on 32 bit anyway?
 
     MemoryPool *pool = malloc(aligned_block*block_amount + sizeof(MemoryPool));
@@ -29,7 +29,7 @@ MemoryPool *pool_init(size_t block_size, size_t block_amount) {
     pool->free_block = pool->buffer;
 
     PoolNode *last = pool->free_block;
-    for (int i = 0; i < block_amount-1; i++) {
+    for (ui32 i = 0; i < block_amount-1; i++) {
         PoolNode *next_addr = (PoolNode*)((ui8*)last + aligned_block);
         last->next = next_addr;
         last = next_addr;

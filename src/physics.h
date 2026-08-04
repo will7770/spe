@@ -1,8 +1,14 @@
+#pragma once
 #include "allocators.h"
 #include "datatypes.h"
-#include "datastructs.h"
 
-#define MAX_ENTITIES 100
+
+#define MAX_ENTITIES 100 // to be changed in favor of changing the amount of active objects dynamically
+extern const FVec2 GRAVITY;
+
+
+typedef struct MainApp MainApp;
+typedef struct UserRenderPanel UserRenderPanel;
 
 
 typedef enum {
@@ -10,9 +16,13 @@ typedef enum {
     BTYPE_DYNAMIC,
 } BodyType;
 
+
 typedef enum {
     BSHAPE_RECTANGLE,
+    BSHAPE_CIRCLE,
+    // TBA: polygon
 } BodyShape;
+
 
 typedef struct {
     BodyType type;
@@ -23,9 +33,14 @@ typedef struct {
     FVec2 velocity;
 
     f32 mass;
-    f32 inv_mass;
+    FVec2 inv_mass;
 
+    // TBA: circular movement and characteristics. (torque, angular vel, rotation)
+    // TBA: friction, restitution
+
+    ui32 id;
 } RigidBody;
+
 
 typedef struct {
     MemoryPool *pool;
@@ -35,7 +50,8 @@ typedef struct {
 } Engine;
 
 
-void InitPhysics(Engine *engine);
+
+void InitPhysics(MainApp *app);
 
 void DestroyPhysics(Engine *engine);
 
@@ -43,6 +59,6 @@ void UpdatePhysics(Engine *engine, UserRenderPanel *panel);
 
 void PhysicsStep(RigidBody *body, f32 dt);
 
-RigidBody *Genesis(Engine *engine, const RigidBody *initial);
+void Genesis(Engine *engine, const RigidBody *initial);
 
-void Thanatos();
+void Thanatos(Engine *engine, RigidBody *body);

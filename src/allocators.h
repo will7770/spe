@@ -1,10 +1,11 @@
 #pragma once
 #include <stddef.h>
+#include "datatypes.h"
 
 typedef struct MemoryPool MemoryPool;
 
 
-MemoryPool *pool_init(size_t block_size, size_t block_amount);
+MemoryPool *pool_init(size_t block_size, ui32 block_amount);
 
 void* pool_alloc(MemoryPool *pool);
 
