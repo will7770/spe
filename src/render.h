@@ -2,6 +2,8 @@
 #include <SDL3/SDL.h>
 #include "datatypes.h"
 
+#define PIXELS_PER_METER 1.0f
+
 
 typedef struct MainApp MainApp;
 typedef struct UserRenderPanel UserRenderPanel;

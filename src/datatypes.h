@@ -1,6 +1,10 @@
 #pragma once
 #include <stdint.h>
 
+
+#define PI_F 3.141592653589793238462643383279502884f
+
+
 typedef uint8_t ui8;
 typedef int8_t i8;
 

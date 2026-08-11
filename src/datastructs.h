@@ -8,10 +8,9 @@
 
 typedef struct UserRenderPanel {
     BodyType body_type;
-    BodyShape body_shape;
+    ui8 vertices_amount;
     SDL_Color color;
     SDL_FPoint draw_coord;
-    bool draw_on_next_frame;
 } UserRenderPanel;
 
 typedef struct MainApp {

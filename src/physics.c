@@ -3,9 +3,11 @@
 #include "datastructs.h"
 #include "physics.h"
 #include <stdlib.h>
+#include <math.h>
 
 
 const FVec2 GRAVITY = { 0.0f, 19.62f };
+
 
 void InitPhysics(MainApp *app) {
     app->engine = (Engine*)malloc(sizeof(Engine));
@@ -20,25 +22,9 @@ void DestroyPhysics(Engine *engine) {
 }
 
 
-void UpdatePhysics(Engine *engine, UserRenderPanel *panel) {
-    if (panel->draw_on_next_frame) {
-        if (engine->active_amount < MAX_ENTITIES) {
-            RigidBody new_body = {
-            .shape = panel->body_shape,
-            .type = panel->body_type,
-            .screen_pos = { .x = panel->draw_coord.x, .y = panel->draw_coord.y },
-            // TBA: fields below also need dynamic initializing
-            .force = { 0.0f, 0.0f },
-            .mass = 100.0f,
-            .inv_mass = {1.0f / 1.0f, 1.0f / 1.0f},
-            .velocity = { 0.0f, 0.5f },
-            .id = engine->active_amount + 1,
-            };
-            Genesis(engine, &new_body);
-        }
-        panel->draw_on_next_frame = false;
-    }
-
+void PhysicsStep(RigidBody *body, f32 dt);
+// replace panel with spawn queue
+void UpdatePhysics(Engine *engine) {
     for (ui32 i = 0; i < engine->active_amount; i++) {
         RigidBody *body = engine->active_objects[i];
         PhysicsStep(body, engine->dt);
@@ -48,23 +34,31 @@ void UpdatePhysics(Engine *engine, UserRenderPanel *panel) {
 
 void PhysicsStep(RigidBody *body, f32 dt) {
     // gravitational force (also, i could make an arena for cache locality. each time the function runs its gonna reference a known addr)
-    FVec2 accel = fvec2_mult(body->force, body->inv_mass);
+    FVec2 accel = fvec2_scalar(body->force, body->inv_mass);
     accel.y += GRAVITY.y;
     body->velocity = fvec2_add(body->velocity, fvec2_scalar(accel, dt)); // <- infinitely adds 
     body->force.x = 0.0f; body->force.y = 0.0f;
 
     // hazardous hardcode below
-    if (body->screen_pos.y < (640.0f - 50.0f)) { body->screen_pos = fvec2_add(body->screen_pos, body->velocity); }
+    if (body->screen_pos.y < (640.0f - 50.0f)) {
+        body->screen_pos = fvec2_add(body->screen_pos, body->velocity);
+     }
     
 }
 
 
-void Genesis(Engine *engine, const RigidBody *initial) {
+bool Genesis(Engine *engine, const RigidBody *bodydef) {
+    if (engine->active_amount == MAX_ENTITIES) {
+        return false;
+    }
+
     RigidBody *new_body = pool_alloc(engine->pool);
-    *new_body = *initial;
+    *new_body = *bodydef;
 
     engine->active_objects[engine->active_amount] = new_body;
     engine->active_amount++;
+
+    return true;
 }
 
 
@@ -73,4 +67,13 @@ void Thanatos(Engine *engine, RigidBody *body) {
     engine->active_amount--;
 
     pool_free(engine->pool, (void*)body);
+}
+
+
+void CreateSimplePolygon(FVec2 vertices[], ui8 edges, f32 radius) {
+    for (ui8 i = 0; i < edges; i++) {
+        f32 radians = (2.0f * PI_F * i) / edges;
+        vertices[i].x = (radius * cosf(radians));
+        vertices[i].y = (radius * sinf(radians));
+    }
 }

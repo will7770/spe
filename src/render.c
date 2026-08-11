@@ -4,6 +4,7 @@
 #include "physics.h"
 #include "render.h"
 #include <stdlib.h>
+#include <stdio.h>
 
 
 
@@ -47,10 +48,7 @@ void UpdateDelta(Render *render, Engine *engine) {
 }
 
 
-void RenderRectangle(SDL_Renderer *renderer, RigidBody *body);
-void RenderCircle(SDL_Renderer *renderer, RigidBody *body, ui8 precision, f32 radius);
-// below is some shit for future
-// void RenderVertexB();
+void RenderShape(SDL_Renderer *renderer, RigidBody *body, ui8 vertice_amount, FVec2 raw_vertex_pos[]);
 
 void RenderFrame(Render *render, Engine *engine) {
     SDL_Renderer *renderer = render->renderer;
@@ -59,14 +57,11 @@ void RenderFrame(Render *render, Engine *engine) {
     SDL_RenderClear(renderer);
     // idea: loop through phys. bodies and call their rendering callbacks
     for (ui32 i = 0; i < engine->active_amount; i++) {
-        switch (engine->active_objects[i]->shape) {
-            case BSHAPE_RECTANGLE:
-                RenderRectangle(renderer, engine->active_objects[i]); break;
-            case BSHAPE_CIRCLE:
-                RenderCircle(renderer, engine->active_objects[i], 64, 25.0f); break;
-        }
+        RigidBody *body = engine->active_objects[i];
+        RenderShape(renderer, body, body->shape_data.vertice_cnt, body->shape_data.vertices);
     }
-    if (engine->active_amount > 0) { 
+    if (engine->active_amount > 0) {
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
         SDL_RenderDebugTextFormat(renderer, 0.0f, 0.0f, "Body1 velocity: { %f;%f }", engine->active_objects[0]->velocity.x, engine->active_objects[0]->velocity.y);
     }
 
@@ -74,40 +69,46 @@ void RenderFrame(Render *render, Engine *engine) {
 }
 
 
-void RenderRectangle(SDL_Renderer *renderer, RigidBody *body) {
-    SDL_FRect rect = { .x=body->screen_pos.x, .y=body->screen_pos.y, .h=50.0f, .w=100.0f}; // constant h and w for now, gonna change it to union property. (radius, half-side, half-h/w)
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-    SDL_RenderRect(renderer, &rect);
-}
+void RenderShape(SDL_Renderer *renderer, RigidBody *body, ui8 vertice_amount, FVec2 raw_vertex_pos[]) {
+    if (body->shape == BSHAPE_CIRCLE) { vertice_amount = 65; }
 
-
-void RenderCircle(SDL_Renderer *renderer, RigidBody *body, ui8 precision, f32 radius) {
-    ui8 total_vertices = precision+1;
-    SDL_Vertex vertices[total_vertices]; // make vertices and indices static arrs. dont accept radius and precision
+    static SDL_Vertex vertices[65]; // make vertices and indices static arrs. dont accept radius and precision
 
     SDL_FColor color = { 0.0f, 0.0f, 0.0f, SDL_ALPHA_OPAQUE_FLOAT };
-    vertices[0].position.x = body->screen_pos.x;
-    vertices[0].position.y = body->screen_pos.y;
-    vertices[0].color = color;
 
-    for (ui8 i = 1; i < total_vertices; i++) {
-        f32 radians = 2.0f * SDL_PI_F * (float)i / (float)precision;
-        vertices[i].position.x = vertices[0].position.x + radius * SDL_cosf(radians);
-        vertices[i].position.y = vertices[0].position.y + radius * SDL_sinf(radians);
-        vertices[i].color = color;
+    if (body->shape == BSHAPE_CIRCLE) {
+        vertices[0].position.x = body->screen_pos.x;
+        vertices[0].position.y = body->screen_pos.y;
+        vertices[0].color = color;
+
+        for (ui8 i = 1; i < vertice_amount; i++) {
+            f32 radians = 2.0f * PI_F * (float)i / (float)(vertice_amount-1);
+            vertices[i].position.x = vertices[0].position.x + (body->shape_data.radius * PIXELS_PER_METER) * SDL_cosf(radians);
+            vertices[i].position.y = vertices[0].position.y + (body->shape_data.radius * PIXELS_PER_METER) * SDL_sinf(radians);
+            vertices[i].color = color;
+        }
+    }
+    else if (body->shape == BSHAPE_POLYGON) {
+        for (ui8 i = 0; i < vertice_amount; i++) {
+            vertices[i].color = color;
+            vertices[i].position.x = (raw_vertex_pos[i].x * PIXELS_PER_METER) + body->screen_pos.x;
+            vertices[i].position.y = (raw_vertex_pos[i].y * PIXELS_PER_METER) + body->screen_pos.y;
+        }
     }
 
-    i32 indices[precision*3];
-    for (ui8 i = 0; i < precision; i++) {
+    ui8 triangle_amount = vertice_amount-2;
+    ui8 index_amount =  triangle_amount*3;
+    i32 indices[index_amount];
+    for (ui8 i = 0; i < triangle_amount; i++) {
         ui8 step = i*3;
 
         indices[step] = 0;
         indices[step+1] = i+1;
         indices[step+2] = i+2;
     }
-    indices[precision*3-1] = 1; // lock the last triangle
+    if (body->shape == BSHAPE_CIRCLE) { indices[index_amount-1] = 1; } // lock the last triangle
 
-    SDL_RenderGeometry(renderer, NULL, vertices, total_vertices, indices, precision*3);
+    SDL_RenderGeometry(renderer, NULL, vertices, vertice_amount, indices, index_amount);
 }
 
 
