@@ -1,5 +1,7 @@
 #include <stdlib.h>
+#include <unistd.h>
 #include "datatypes.h"
+#include "allocators.h"
 
 
 typedef struct PoolNode {
@@ -7,7 +9,7 @@ typedef struct PoolNode {
 } PoolNode;
 
 
-typedef struct {
+typedef struct MemoryPool {
     void* buffer;
     PoolNode *free_block;
     size_t block_size;
@@ -62,4 +64,29 @@ void pool_free(MemoryPool *pool, void *addr) {
 
 void pool_destroy(MemoryPool *pool) {
     free(pool);
+}
+
+
+
+void *darray_init(size_t block_size, size_t block_amount) {
+    void *buffer = malloc(block_size * block_amount);
+    return buffer;
+}
+
+
+void *darray_alloc(void *array, ui32 array_size, ui32 block_size) {
+    return (void*)((char*)array + array_size * block_size);
+}
+
+
+void darray_dealloc(void *array, ui32 array_size, ui32 block_size, ui32 idx) {
+    char *dst = (char*)array + idx * block_size;
+    char *src = (char*)array + (array_size-1) * block_size;
+
+    memcpy((void*)dst, (void*)src, block_size);
+}
+
+
+void darray_free(void *array) {
+    free(array);
 }

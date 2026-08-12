@@ -25,11 +25,29 @@ typedef enum {
 } BodyShape;
 
 
-typedef struct {
+typedef struct BodyDef {
     BodyType type;
+
+    FVec2 screen_pos;
+    FVec2 force;
+    FVec2 velocity;
+
+    f32 mass;
+
     BodyShape shape;
 
-    ui32 geometry_id;
+    union {
+        f32 radius;
+        struct {
+            FVec2 vertices[MAX_POLYGON_VERTICES];
+            ui32 vertice_cnt;
+        };
+    } data;
+} BodyDef;
+
+
+typedef struct {
+    BodyType type;
 
     FVec2 screen_pos;
     FVec2 force;
@@ -40,14 +58,13 @@ typedef struct {
 
     // TBA: circular movement and characteristics. (torque, angular vel, rotation)
     // TBA: friction, restitution
-
-    ui32 id;
+    
+    // in case ill ever add complex bodies, geometry will need to have its id tracked. arrays wont be parallel
 } RigidBody;
 
 
 typedef struct BodyGeometry {
     BodyShape shape;
-    ui32 body_id;
 
     union {
         f32 radius;
@@ -60,12 +77,11 @@ typedef struct BodyGeometry {
 
 
 typedef struct {
-    MemoryPool *pool;
+    RigidBody *rbodies;
+    BodyGeometry *gbodies;
 
-    // DEPRECATED
-    RigidBody *active_objects[MAX_ENTITIES];
     ui32 active_amount;
-    // DEPRECATED
+
     f32 dt;
 } Engine;
 
@@ -77,9 +93,9 @@ void DestroyPhysics(Engine *engine);
 
 void UpdatePhysics(Engine *engine);
 
-bool Genesis(Engine *engine, const RigidBody *bodydef);
+bool Genesis(Engine *engine, const BodyDef *bodydef);
 
-void Thanatos(Engine *engine, RigidBody *body);
+void Thanatos(Engine *engine, ui32 body_id);
 
 
 void CreateSimplePolygon(FVec2 vertices[], ui8 edges, f32 radius);

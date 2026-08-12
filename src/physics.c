@@ -11,13 +11,15 @@ const FVec2 GRAVITY = { 0.0f, 19.62f };
 
 void InitPhysics(MainApp *app) {
     app->engine = (Engine*)malloc(sizeof(Engine));
-    app->engine->pool = pool_init(sizeof(RigidBody), MAX_ENTITIES);
+    app->engine->rbodies = (RigidBody*)darray_init(sizeof(RigidBody), MAX_ENTITIES);
+    app->engine->gbodies = (BodyGeometry*)darray_init(sizeof(BodyGeometry), MAX_ENTITIES);
     app->engine->active_amount = 0;
 }
 
 
 void DestroyPhysics(Engine *engine) {
-    pool_destroy(engine->pool);
+    darray_free(engine->rbodies);
+    darray_free(engine->gbodies);
     free(engine);
 }
 
@@ -26,7 +28,7 @@ void PhysicsStep(RigidBody *body, f32 dt);
 // replace panel with spawn queue
 void UpdatePhysics(Engine *engine) {
     for (ui32 i = 0; i < engine->active_amount; i++) {
-        RigidBody *body = engine->active_objects[i];
+        RigidBody *body = &engine->rbodies[i];
         PhysicsStep(body, engine->dt);
     }
 }
@@ -47,26 +49,38 @@ void PhysicsStep(RigidBody *body, f32 dt) {
 }
 
 
-bool Genesis(Engine *engine, const RigidBody *bodydef) {
+bool Genesis(Engine *engine, const BodyDef *bodydef) {
     if (engine->active_amount == MAX_ENTITIES) {
         return false;
     }
 
-    RigidBody *new_body = pool_alloc(engine->pool);
-    *new_body = *bodydef;
+    RigidBody *new_rbody = darray_alloc(engine->rbodies, engine->active_amount, sizeof(RigidBody));
+    new_rbody->force = bodydef->force;
+    new_rbody->mass = bodydef->mass;
+    new_rbody->inv_mass = 1.0f / new_rbody->mass;
+    new_rbody->screen_pos = bodydef->screen_pos;
+    new_rbody->velocity = bodydef->velocity;
+    new_rbody->type = bodydef->type;
 
-    engine->active_objects[engine->active_amount] = new_body;
+    BodyGeometry *new_gbody = darray_alloc(engine->gbodies, engine->active_amount, sizeof(BodyGeometry));
+    new_gbody->shape = bodydef->shape;
+    if (new_gbody->shape == BSHAPE_POLYGON) {
+        new_gbody->data.vertice_cnt = bodydef->data.vertice_cnt;
+        memcpy(new_gbody->data.vertices, bodydef->data.vertices, sizeof(FVec2)*bodydef->data.vertice_cnt);
+    }
+    else {
+        new_gbody->data.radius = bodydef->data.radius;
+    }
+
     engine->active_amount++;
 
     return true;
 }
 
 
-void Thanatos(Engine *engine, RigidBody *body) {
-    engine->active_objects[body->id] = engine->active_objects[engine->active_amount-1];
+void Thanatos(Engine *engine, ui32 body_id) {
+    darray_dealloc(engine->rbodies, engine->active_amount, sizeof(RigidBody), body_id);
     engine->active_amount--;
-
-    pool_free(engine->pool, (void*)body);
 }
 
 

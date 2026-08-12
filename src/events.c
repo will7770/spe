@@ -45,6 +45,7 @@ bool HandleKeyDown(MainApp *app) {
 
     if (key->scancode == SDL_SCANCODE_Q) {
         SDL_GetMouseState(&panel->draw_coord.x, &panel->draw_coord.y);
+        panel->body_type = BTYPE_DYNAMIC;
         CreateBodyFromInput(app->engine, panel);
     }
     else if (SDL_SCANCODE_1 <= key->scancode && key->scancode <= SDL_SCANCODE_8) {
@@ -62,26 +63,24 @@ bool HandleKeyUp(MainApp *app) {
 
 void CreateBodyFromInput(Engine *engine, UserRenderPanel *panel) {
     if (engine->active_amount < MAX_ENTITIES) {
-        RigidBody new_body = {0};
+        BodyDef new_body;
         new_body.screen_pos = (FVec2){ .x = panel->draw_coord.x, .y = panel->draw_coord.y };
 
         if (panel->vertices_amount == 1) { 
             new_body.shape = BSHAPE_CIRCLE;
-            new_body.shape_data.radius = 50.0f;
+            new_body.data.radius = 50.0f;
         }
         else {
             new_body.shape = BSHAPE_POLYGON;
-            new_body.shape_data.vertice_cnt = panel->vertices_amount;
-            CreateSimplePolygon(new_body.shape_data.vertices, panel->vertices_amount, 50.0f);
+            new_body.data.vertice_cnt = panel->vertices_amount;
+            CreateSimplePolygon(new_body.data.vertices, panel->vertices_amount, 50.0f);
         }
 
         new_body.type = panel->body_type;
         // TBA: fields below also need dynamic initializing
         new_body.force = (FVec2){ 0.0f, 0.0f };
         new_body.mass = 100.0f;
-        new_body.inv_mass = 1.0f / 100.0f;
         new_body.velocity = (FVec2){ 0.0f, 0.5f };
-        new_body.id = engine->active_amount + 1;
 
         Genesis(engine, &new_body);
     }
